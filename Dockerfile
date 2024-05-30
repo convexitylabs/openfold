@@ -17,6 +17,7 @@ RUN wget -P /tmp \
     && bash /tmp/Miniforge3-Linux-x86_64.sh -b -p /opt/conda \
     && rm /tmp/Miniforge3-Linux-x86_64.sh
 ENV PATH /opt/conda/bin:$PATH
+WORKDIR /app
 
 COPY environment.yml /opt/openfold/environment.yml
 
@@ -24,12 +25,25 @@ COPY environment.yml /opt/openfold/environment.yml
 RUN mamba env update -n base --file /opt/openfold/environment.yml && mamba clean --all
 RUN export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 
-COPY openfold /opt/openfold/openfold
-COPY scripts /opt/openfold/scripts
-COPY run_pretrained_openfold.py /opt/openfold/run_pretrained_openfold.py
-COPY train_openfold.py /opt/openfold/train_openfold.py
-COPY setup.py /opt/openfold/setup.py
+COPY services/openfold /opt/openfold/openfold
+COPY services/openfold/scripts /opt/openfold/scripts
+COPY services/openfold/run_pretrained_openfold.py /opt/openfold/run_pretrained_openfold.py
+COPY services/openfold/train_openfold.py /opt/openfold/train_openfold.py
+COPY services/openfold/setup.py /opt/openfold/setup.py
 RUN wget -q -P /opt/openfold/openfold/resources \
     https://git.scicore.unibas.ch/schwede/openstructure/-/raw/7102c63615b64735c4941278d92b554ec94415f8/modules/mol/alg/src/stereo_chemical_props.txt
 WORKDIR /opt/openfold
 RUN python3 setup.py install
+
+# fetching artifacts 
+ADD https://convexity-artifacts.s3.us-east-2.amazonaws.com/alphafold/alphafold_params_2022-12-06.tar alphafold_params_2022-12-06.tar
+RUN set -ex; \
+    mkdir -p /cache/openfold/params \
+     && tar -xvf alphafold_params_2022-12-06.tar -C /cache/openfold/params \
+     && rm -rf alphafold_params_2022-12-06.tar \
+     && touch /cache/openfold/params/download_complexes_multimer_v3_finished.txt
+
+# convexity 
+COPY utils/test_data ./test_data
+COPY packages/core_convexity /opt/core_convexity
+RUN pip install --no-cache-dir /opt/core_convexity

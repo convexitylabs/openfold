@@ -19,31 +19,39 @@ RUN wget -P /tmp \
 ENV PATH /opt/conda/bin:$PATH
 WORKDIR /app
 
-COPY environment.yml /opt/openfold/environment.yml
+COPY services/openfold/environment.yml /opt/openfold/environment.yml
 
 # installing into the base environment since the docker container wont do anything other than run openfold
 RUN mamba env update -n base --file /opt/openfold/environment.yml && mamba clean --all
 RUN export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}
 
-COPY services/openfold /opt/openfold/openfold
+COPY services/openfold/openfold /opt/openfold/openfold
 COPY services/openfold/scripts /opt/openfold/scripts
-COPY services/openfold/run_pretrained_openfold.py /opt/openfold/run_pretrained_openfold.py
-COPY services/openfold/train_openfold.py /opt/openfold/train_openfold.py
 COPY services/openfold/setup.py /opt/openfold/setup.py
 RUN wget -q -P /opt/openfold/openfold/resources \
     https://git.scicore.unibas.ch/schwede/openstructure/-/raw/7102c63615b64735c4941278d92b554ec94415f8/modules/mol/alg/src/stereo_chemical_props.txt
 WORKDIR /opt/openfold
-RUN python3 setup.py install
+RUN python3 /opt/openfold/setup.py install
 
 # fetching artifacts 
 ADD https://convexity-artifacts.s3.us-east-2.amazonaws.com/alphafold/alphafold_params_2022-12-06.tar alphafold_params_2022-12-06.tar
 RUN set -ex; \
-    mkdir -p /cache/openfold/params \
-     && tar -xvf alphafold_params_2022-12-06.tar -C /cache/openfold/params \
+    mkdir -p /cache/alphafold/params \
+     && tar -xvf alphafold_params_2022-12-06.tar -C /cache/alphafold/params \
      && rm -rf alphafold_params_2022-12-06.tar \
-     && touch /cache/openfold/params/download_complexes_multimer_v3_finished.txt
+     && touch /cache/alphafold/params/download_complexes_multimer_v3_finished.txt
+COPY services/openfold/data/openfold_params /cache/openfold/openfold_params
+RUN ln -s /cache/openfold/openfold_params /opt/openfold/openfold/resources/openfold_params
+
+
+# completing transfer
+COPY services/openfold/run_pretrained_openfold.py /opt/openfold/run_pretrained_openfold.py
+COPY services/openfold/train_openfold.py /opt/openfold/train_openfold.py
 
 # convexity 
+COPY services/openfold/examples /opt/openfold/examples
 COPY utils/test_data ./test_data
 COPY packages/core_convexity /opt/core_convexity
 RUN pip install --no-cache-dir /opt/core_convexity
+RUN echo "source activate base" >> ~/.bashrc
+RUN mkdir /mmcifs

@@ -11,7 +11,7 @@ dependencies:
   - openmm=7.7
   - pdbfixer
   - pytorch-lightning
-  - biopython
+  - biopython==1.81
   - numpy
   - pandas
   - PyYAML==5.4.1
